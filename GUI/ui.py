@@ -1,5 +1,5 @@
 from PySide6 import QtCore
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QFont
 from PySide6.QtWidgets import QMainWindow, QDockWidget, QVBoxLayout, QTextEdit, QFrame, QHBoxLayout, QGroupBox, QLabel, \
     QComboBox, QPushButton, QCheckBox, QLineEdit, QWidget, QPlainTextEdit, QGridLayout, QSlider, QSpinBox
 
@@ -35,7 +35,7 @@ class Ui(QMainWindow):
         self.setCorner(QtCore.Qt.BottomLeftCorner, QtCore.Qt.LeftDockWidgetArea)
         dock_left.setWidget(self.frame_left)
         dock_left.setMinimumWidth(270)
-        dock_left.setMaximumWidth(450)
+        dock_left.setMaximumWidth(350)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, dock_left)
 
         dock_bot = QDockWidget("Log", self)
@@ -48,6 +48,8 @@ class Ui(QMainWindow):
         dock_right.setTitleBarWidget(QWidget(None))
         self.setCorner(QtCore.Qt.BottomRightCorner, QtCore.Qt.RightDockWidgetArea)
         dock_right.setWidget(self.frame_right)
+        dock_right.setMinimumWidth(250)
+        dock_right.setMaximumWidth(350)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_right)
 
         # add components to main window
@@ -60,6 +62,7 @@ class Ui(QMainWindow):
         # display main window
         self.show()
 
+    # Center widget
     def camera_show(self):
         self.frame_center = QFrame()
         layout_center = QVBoxLayout()
@@ -68,6 +71,7 @@ class Ui(QMainWindow):
 
         # create cam show group box
         groupbox_camShow = QGroupBox("Realtime Camera Display")
+        groupbox_camShow.setFont(QFont("Arial", 12, weight=QFont.Bold))
 
         # create cam show area layout
         layout_camShow = QVBoxLayout()
@@ -84,6 +88,7 @@ class Ui(QMainWindow):
 
         layout_center.addWidget(groupbox_camShow)
 
+    # Top dock
     def quick_settings(self):
         # create container for quick settings area
         self.frame_top = QFrame()
@@ -102,6 +107,7 @@ class Ui(QMainWindow):
         # create components inside camera settings area
         label_camSet = QLabel("Select camera")
         combobox_camSet = QComboBox()
+        combobox_camSet.addItem("Build-in camera")
         btn_camSet_connect = QPushButton("Connect")
 
         # add components to quick settings
@@ -121,14 +127,15 @@ class Ui(QMainWindow):
         # create components inside serial port settings
         label_portSet = QLabel("Select serial port")
         combobox_portSet = QComboBox()
+        combobox_portSet.addItem("COM1")
         btn_portSet_connect = QPushButton("Connect")
 
         # add components to serial port settings
-        layout_portSet.addWidget(label_portSet)
+        layout_portSet.addWidget(label_portSet, )
         layout_portSet.addStretch()
-        layout_portSet.addWidget(combobox_portSet)
+        layout_portSet.addWidget(combobox_portSet, 1.5, QtCore.Qt.AlignmentFlag.AlignLeft)
         layout_portSet.addStretch()
-        layout_portSet.addWidget(btn_portSet_connect)
+        layout_portSet.addWidget(btn_portSet_connect, 0.5)
 
         # create other settings group box
         groupbox_otherSet = QGroupBox("Other Settings")
@@ -159,113 +166,87 @@ class Ui(QMainWindow):
         layout_top.addWidget(groupbox_portSet)
         layout_top.addWidget(groupbox_otherSet)
 
+    # Left dock
     def general(self):
         self.frame_left = QFrame()
         # self.frame_left.setStyleSheet("background-color: red;")
 
-        ###################################
-        # START CREATE GENERAL COMPONENTS #
-        ###################################
-
-        # create results group box
-        groupbox_result = QGroupBox("Result")
-
-        # create results area layout
-        layout_result = QVBoxLayout()
-        groupbox_result.setLayout(layout_result)
-
-        # create components inside result group box
-        # image_result = QPixmap("./media/icon/product.png")
-        image_result = QLabel("Result")
-
-        label_result = QLabel("Result")
-
-        # add components to results group box
-        layout_result.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
-        layout_result.addWidget(image_result)
-        layout_result.addWidget(label_result)
-
-        # create statistics group box
-        groupbox_statistics = QGroupBox("Statistics")
-
-        # create statistics layout
-        layout_statistics = QVBoxLayout()
-        groupbox_statistics.setLayout(layout_statistics)
-
-        # create total layout
-        layout_totalNum = QHBoxLayout()
-
-        # create components inside total layout
-        label_totalNum = QLabel("Total Classified:")
-        lineEdit_totalNum = QLineEdit()
-
-        # add components to total layout
-        layout_totalNum.addWidget(label_totalNum)
-        layout_totalNum.addStretch()
-        layout_totalNum.addWidget(lineEdit_totalNum)
-
-        # create passed layout
-        layout_passedNum = QHBoxLayout()
-
-        # create components inside passed layout
-        label_passedNum = QLabel("Total Passed:")
-        lineEdit_passedNum = QLineEdit()
-
-        # add components to passed layout
-        layout_passedNum.addWidget(label_passedNum)
-        layout_passedNum.addStretch()
-        layout_passedNum.addWidget(lineEdit_passedNum)
-
-        # create failed layout
-        layout_failedNum = QHBoxLayout()
-
-        # create components inside failed layout
-        label_failedNum = QLabel("Total Failed:")
-        lineEdit_failedNum = QLineEdit()
-
-        # add components to passed layout
-        layout_failedNum.addWidget(label_failedNum)
-        layout_failedNum.addStretch()
-        layout_failedNum.addWidget(lineEdit_failedNum)
-
-        # add 3 layout to statistics layout
-        layout_statistics.addLayout(layout_totalNum)
-        layout_statistics.addLayout(layout_passedNum)
-        layout_statistics.addLayout(layout_failedNum)
-
-        # create control group box
-        groupbox_control = QGroupBox("Control")
-
-        # create control layout
-        layout_control = QHBoxLayout()
-        groupbox_control.setLayout(layout_control)
-
-        # create components inside control group box
-        btn_run = QPushButton("Run")
-        btn_stop = QPushButton("Stop")
-
-        # add components to control group box
-        layout_control.addWidget(btn_run)
-        layout_control.addWidget(btn_stop)
-
-        #################################
-        # END CREATE GENERAL COMPONENTS #
-        #################################
-
-        # create layout for general
         layout_left = QVBoxLayout()
         self.frame_left.setLayout(layout_left)
 
-        # add group box to frame
+        groupbox_result = QGroupBox("Result")
+
+        layout_result = QVBoxLayout()
+        groupbox_result.setLayout(layout_result)
+
+        holder_result = QLabel()
+        holder_result.setMinimumSize(200, 200)
+        holder_result.setPixmap(QPixmap("./media/pic/200x200.png"))
+        holder_result.setScaledContents(True)
+
+        label_result = QLabel("Result show here")
+
+        layout_result.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
+        layout_result.addWidget(holder_result)
+        layout_result.addWidget(label_result, alignment=QtCore.Qt.AlignCenter)
+
+        groupbox_statistics = QGroupBox("Statistics")
+
+        layout_statistics = QGridLayout()
+        groupbox_statistics.setLayout(layout_statistics)
+        layout_statistics.setColumnStretch(0, 1)
+        layout_statistics.setColumnStretch(1, 1)
+
+        label_totalNum = QLabel("Total Classified:")
+        lineEdit_totalNum = QLineEdit()
+        layout_statistics.addWidget(label_totalNum, 0, 0)
+        layout_statistics.addWidget(lineEdit_totalNum, 0, 1)
+
+        label_passedNum = QLabel("Total Passed:")
+        lineEdit_passedNum = QLineEdit()
+        layout_statistics.addWidget(label_passedNum, 1, 0)
+        layout_statistics.addWidget(lineEdit_passedNum, 1, 1)
+
+        label_failedNum = QLabel("Total Failed:")
+        lineEdit_failedNum = QLineEdit()
+        layout_statistics.addWidget(label_failedNum, 2, 0)
+        layout_statistics.addWidget(lineEdit_failedNum, 2, 1)
+
+        frame_split = QFrame()
+        frame_split.setMaximumHeight(1)
+        frame_split.setFrameShape(QFrame.StyledPanel)
+        layout_statistics.addWidget(frame_split, 3, 0, 1, 2)
+
+        label_passedPercent = QLabel("Passed percentage:")
+        lineEdit_passedPercent = QLineEdit()
+        layout_statistics.addWidget(label_passedPercent, 4, 0)
+        layout_statistics.addWidget(lineEdit_passedPercent, 4, 1)
+
+        label_failedPercent = QLabel("Failed percentage:")
+        lineEdit_failedPercent = QLineEdit()
+        layout_statistics.addWidget(label_failedPercent, 5, 0)
+        layout_statistics.addWidget(lineEdit_failedPercent, 5, 1)
+
+        groupbox_control = QGroupBox("Control")
+
+        layout_control = QHBoxLayout()
+        groupbox_control.setLayout(layout_control)
+
+        btn_run = QPushButton("Run")
+        btn_stop = QPushButton("Stop")
+
+        layout_control.addWidget(btn_run)
+        layout_control.addWidget(btn_stop)
+
         layout_left.addWidget(groupbox_result)
         layout_left.addWidget(groupbox_statistics)
         layout_left.addWidget(groupbox_control)
 
-        # set stretch layout for general
         layout_left.setStretchFactor(groupbox_result, 3)
-        layout_left.setStretchFactor(groupbox_statistics, 2)
+        layout_left.setStretchFactor(groupbox_statistics, 3)
         layout_left.setStretchFactor(groupbox_control, 1)
 
+    # Bottom dock
     def log(self):
         self.frame_bot = QFrame()
 
@@ -285,6 +266,7 @@ class Ui(QMainWindow):
 
         layout_bot.addWidget(groupbox_log)
 
+    # Right dock
     def details(self):
         self.frame_right = QFrame()
         layout_right = QVBoxLayout()
@@ -300,21 +282,21 @@ class Ui(QMainWindow):
 
         holder_contour = QLabel()
         holder_contour.setMinimumSize(150, 150)
-        holder_contour.setPixmap(QPixmap("./media/pic/100x100.png"))
+        holder_contour.setPixmap(QPixmap("./media/pic/150x150_1.png"))
         holder_contour.setScaledContents(True)
 
         label_hough = QLabel("Hough Circle Process")
 
         holder_hough = QLabel()
         holder_hough.setMinimumSize(150, 150)
-        holder_hough.setPixmap(QPixmap("./media/pic/100x100.png"))
+        holder_hough.setPixmap(QPixmap("./media/pic/150x150_2.png"))
         holder_hough.setScaledContents(True)
 
         label_yolo = QLabel("Yolo Process")
 
         holder_yolo = QLabel()
         holder_yolo.setMinimumSize(150, 150)
-        holder_yolo.setPixmap(QPixmap("./media/pic/100x100.png"))
+        holder_yolo.setPixmap(QPixmap("./media/pic/150x150_3.png"))
         holder_yolo.setScaledContents(True)
 
         layout_detailProcess.addWidget(label_contour, alignment=QtCore.Qt.AlignCenter)
@@ -327,11 +309,15 @@ class Ui(QMainWindow):
         layout_right.addWidget(groupbox_detailProcess)
 
         # param setting
-        groupbox_paramCfg = QGroupBox("Parameter Settings")
+        groupbox_param = QGroupBox("Parameter Settings")
+        layout_param = QVBoxLayout()
+        groupbox_param.setLayout(layout_param)
+
         layout_paramCfg = QGridLayout()
-        groupbox_paramCfg.setLayout(layout_paramCfg)
+        layout_param.addLayout(layout_paramCfg)
 
         label_errorThreshold = QLabel("Error Threshold")
+        label_errorThreshold.setToolTip("Set the threshold for error percentage of the bearing seal size")
         slider_errorThreshold = QSlider(QtCore.Qt.Horizontal)
         spinbox_errorThreshold = QSpinBox()
 
@@ -339,5 +325,17 @@ class Ui(QMainWindow):
         layout_paramCfg.addWidget(slider_errorThreshold, 0, 1)
         layout_paramCfg.addWidget(spinbox_errorThreshold, 0, 2)
 
+        layout_saveCfg = QHBoxLayout()
+        layout_param.addLayout(layout_saveCfg)
+
+        btn_defaultCfg = QPushButton("Reset settings")
+        btn_defaultCfg.setToolTip("Reset all parameters to default value")
+
+        btn_saveCfg = QPushButton("Save settings")
+        btn_saveCfg.setToolTip("Save all parameters was set by user")
+
+        layout_saveCfg.addWidget(btn_defaultCfg)
+        layout_saveCfg.addWidget(btn_saveCfg)
+
         layout_right.addWidget(groupbox_detailProcess)
-        layout_right.addWidget(groupbox_paramCfg)
+        layout_right.addWidget(groupbox_param)
