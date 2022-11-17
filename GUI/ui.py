@@ -1,7 +1,47 @@
-from PySide6 import QtCore
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, QPoint
+from PySide6.QtGui import QPixmap, QPainter
 from PySide6.QtWidgets import QMainWindow, QDockWidget, QVBoxLayout, QTextEdit, QFrame, QHBoxLayout, QGroupBox, QLabel, \
     QComboBox, QPushButton, QCheckBox, QLineEdit, QWidget, QPlainTextEdit, QGridLayout, QSlider, QSpinBox
+
+
+class MediaHolder(QLabel):
+    def __init__(self, img, img_w, img_h):
+        super(MediaHolder, self).__init__()
+        self.pixmap = QPixmap(img)
+        self.setMinimumSize(img_w, img_h)
+
+    def paintEvent(self, event):
+        holder_size = self.size()
+        holder_painter = QPainter(self)
+        holder_x = self.x()
+        holder_y = self.y()
+        holder_coordinates = QPoint(holder_x, holder_y)
+        scaled_pixmap = self.pixmap.scaled(holder_size, Qt.KeepAspectRatio, Qt.FastTransformation)
+        # start painting the label from left upper corner
+        holder_coordinates.setX((holder_size.width() - scaled_pixmap.width()) / 2)
+        holder_coordinates.setY((holder_size.height() - scaled_pixmap.height()) / 2)
+        holder_painter.drawPixmap(holder_coordinates, scaled_pixmap)
+
+
+class DockInit(QDockWidget):
+    def __init__(self, name, title, widget):
+        super(DockInit, self).__init__()
+        self.setObjectName(name)
+        self.setTitleBarWidget(title)
+        self.setWidget(widget)
+
+
+class ButtonInit(QPushButton):
+    def __init__(self, name, tips, width, height, color1, color2, color3):
+        super(ButtonInit, self).__init__()
+        self.setText(name)
+        self.setMinimumWidth(width)
+        self.setMinimumHeight(height)
+        self.setToolTip(tips)
+        self.setStyleSheet("QPushButton{border: 2px solid %s; background-color: %s;}"
+                           "QPushButton:hover{background-color: %s;}"
+                           "QPushButton:pressed{border: 2px solid %s; background-color: %s;}" % (
+                               color1, color2, color1, color3, color3))
 
 
 class Ui(QMainWindow):
@@ -13,6 +53,8 @@ class Ui(QMainWindow):
     def main_window(self):
         # set main window title
         self.setWindowTitle("Bearing Seal Classification")
+        self.setCorner(Qt.BottomLeftCorner, Qt.LeftDockWidgetArea)
+        self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
 
         # create layout for main window
         layout_mainWindow = QVBoxLayout()
@@ -26,35 +68,25 @@ class Ui(QMainWindow):
         self.makeup()
 
         # create dock inside main window
-        dock_top = QDockWidget("Quick Settings", self)
-        dock_top.setTitleBarWidget(QWidget(None))
-        dock_top.setWidget(self.frame_top)
+        dock_top = DockInit("Quick Settings", QWidget(None), self.frame_top)
         dock_top.setMinimumHeight(110)
         dock_top.setMaximumHeight(130)
-        self.addDockWidget(QtCore.Qt.DockWidgetArea.TopDockWidgetArea, dock_top)
+        self.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, dock_top)
 
-        dock_left = QDockWidget("General", self)
-        dock_left.setTitleBarWidget(QWidget(None))
-        self.setCorner(QtCore.Qt.BottomLeftCorner, QtCore.Qt.LeftDockWidgetArea)
-        dock_left.setWidget(self.frame_left)
+        dock_left = DockInit("General", QWidget(None), self.frame_left)
         dock_left.setMinimumWidth(270)
         dock_left.setMaximumWidth(350)
-        self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, dock_left)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock_left)
 
-        dock_bot = QDockWidget("Log", self)
-        dock_bot.setTitleBarWidget(QWidget(None))
-        dock_bot.setWidget(self.frame_bot)
+        dock_bot = DockInit("Logs", QWidget(None), self.frame_bot)
         dock_bot.setMinimumHeight(110)
         dock_bot.setMinimumHeight(200)
-        self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, dock_bot)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock_bot)
 
-        dock_right = QDockWidget("Detail", self)
-        dock_right.setTitleBarWidget(QWidget(None))
-        self.setCorner(QtCore.Qt.BottomRightCorner, QtCore.Qt.RightDockWidgetArea)
-        dock_right.setWidget(self.frame_right)
-        dock_right.setMinimumWidth(250)
+        dock_right = DockInit("Details", QWidget(None), self.frame_right)
+        dock_right.setMinimumWidth(270)
         dock_right.setMaximumWidth(350)
-        self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_right)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock_right)
 
         # add components to main window
         layout_mainWindow.addWidget(QTextEdit())
@@ -81,10 +113,7 @@ class Ui(QMainWindow):
         groupbox_camShow.setLayout(layout_camShow)
 
         # create components inside cam show area
-        holder_camShow = QLabel()
-        holder_camShow.setMinimumSize(800, 600)
-        holder_camShow.setPixmap(QPixmap("./media/pic/800x600.jpg"))
-        holder_camShow.setScaledContents(True)
+        holder_camShow = MediaHolder("./media/pic/800x600.jpg", 800, 600)
 
         # add components to cam show
         layout_camShow.addWidget(holder_camShow)
@@ -109,12 +138,8 @@ class Ui(QMainWindow):
         combobox_camSet = QComboBox()
         combobox_camSet.setToolTip("Select camera to connect")
         combobox_camSet.addItem("Build-in camera")
-        btn_camSet_connect = QPushButton("Connect")
-        btn_camSet_connect.setToolTip("Connect to selected camera")
-        btn_camSet_connect.setMinimumSize(80, 35)
-        btn_camSet_connect.setStyleSheet("QPushButton{border: 2px solid #fad4a6; background-color: #fbe7ab;}"
-                                         "QPushButton:hover{background-color: #fad4a6;}"
-                                         "QPushButton:pressed{border: 2px solid #f8a57f; background-color: #f8a57f;}")
+        btn_camSet_connect = ButtonInit("Connect", "Connect to selected camera", 80, 35, "#fad4a6", "#fbe7ab",
+                                        "#f8a57f")
 
         layout_camSet.addWidget(label_camSet)
         layout_camSet.addStretch()
@@ -137,12 +162,8 @@ class Ui(QMainWindow):
         combobox_baudRateSet.setToolTip("Select baudrate of the COM port")
         combobox_baudRateSet.addItem("115200")
 
-        btn_portSet_connect = QPushButton("Connect")
-        btn_portSet_connect.setToolTip("Connect to selected COM port")
-        btn_portSet_connect.setMinimumSize(80, 35)
-        btn_portSet_connect.setStyleSheet("QPushButton{border: 2px solid #fad4a6; background-color: #fbe7ab;}"
-                                          "QPushButton:hover{background-color: #fad4a6;}"
-                                          "QPushButton:pressed{border: 2px solid #f8a57f; background-color: #f8a57f;}")
+        btn_portSet_connect = ButtonInit("Connect", "Connect to selected COM port", 80, 35, "#fad4a6", "#fbe7ab",
+                                         "#f8a57f")
 
         # add components to serial port settings
         layout_portSet.addWidget(label_portSet, )
@@ -166,12 +187,8 @@ class Ui(QMainWindow):
         checkbox_otherSet_showTab = QCheckBox("Hide Right Tab")
         checkbox_otherSet_showTab.setToolTip("Show/hide additions tab for detail settings")
 
-        btn_otherSet_init = QPushButton("Initialize System")
-        btn_otherSet_init.setToolTip("Set whole system to the initial working condition")
-        btn_otherSet_init.setMinimumSize(110, 35)
-        btn_otherSet_init.setStyleSheet("QPushButton{border: 2px solid #fad4a6; background-color: #fbe7ab;}"
-                                        "QPushButton:hover{background-color: #fad4a6;}"
-                                        "QPushButton:pressed{border: 2px solid #f8a57f; background-color: #f8a57f;}")
+        btn_otherSet_init = ButtonInit("Initialize System", "Set whole system to the initial working condition", 120,
+                                       35, "#fad4a6", "#fbe7ab", "#f8a57f")
 
         # add components to other settings
         layout_otherSet.addWidget(checkbox_otherSet_showTab)
@@ -206,16 +223,12 @@ class Ui(QMainWindow):
         layout_result = QVBoxLayout()
         groupbox_result.setLayout(layout_result)
 
-        holder_result = QLabel()
-        holder_result.setMinimumSize(200, 200)
-        holder_result.setPixmap(QPixmap("./media/pic/200x200.png"))
-        holder_result.setScaledContents(True)
+        holder_result = MediaHolder("./media/pic/200x200.png", 200, 200)
 
         label_result = QLabel("Result show here")
 
-        layout_result.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
         layout_result.addWidget(holder_result)
-        layout_result.addWidget(label_result, alignment=QtCore.Qt.AlignCenter)
+        layout_result.addWidget(label_result, alignment=Qt.AlignCenter)
 
         groupbox_statistics = QGroupBox("Statistics")
 
@@ -226,7 +239,7 @@ class Ui(QMainWindow):
 
         label_totalNum = QLabel("Total Classified:")
         lineEdit_totalNum = QLineEdit("0")
-        lineEdit_totalNum.setAlignment(QtCore.Qt.AlignCenter)
+        lineEdit_totalNum.setAlignment(Qt.AlignCenter)
         lineEdit_totalNum.setReadOnly(True)
         lineEdit_totalNum.setMinimumSize(110, 35)
         lineEdit_totalNum.setStyleSheet("QLineEdit{border: 2px solid #6695ED; background-color: #6695ED;}"
@@ -237,7 +250,7 @@ class Ui(QMainWindow):
 
         label_passedNum = QLabel("Total Passed:")
         lineEdit_passedNum = QLineEdit("0")
-        lineEdit_passedNum.setAlignment(QtCore.Qt.AlignCenter)
+        lineEdit_passedNum.setAlignment(Qt.AlignCenter)
         lineEdit_passedNum.setReadOnly(True)
         lineEdit_passedNum.setMinimumSize(110, 35)
         lineEdit_passedNum.setStyleSheet("QLineEdit{border: 2px solid #72fa93; background-color: #72fa93;}"
@@ -248,7 +261,7 @@ class Ui(QMainWindow):
 
         label_failedNum = QLabel("Total Failed:")
         lineEdit_failedNum = QLineEdit("0")
-        lineEdit_failedNum.setAlignment(QtCore.Qt.AlignCenter)
+        lineEdit_failedNum.setAlignment(Qt.AlignCenter)
         lineEdit_failedNum.setReadOnly(True)
         lineEdit_failedNum.setMinimumSize(110, 35)
         lineEdit_failedNum.setStyleSheet("QLineEdit{border: 2px solid #e36255; background-color: #e36255;}"
@@ -264,14 +277,14 @@ class Ui(QMainWindow):
 
         label_passedPercent = QLabel("Passed percentage:")
         lineEdit_passedPercent = QLineEdit("0%")
-        lineEdit_passedPercent.setAlignment(QtCore.Qt.AlignCenter)
+        lineEdit_passedPercent.setAlignment(Qt.AlignCenter)
         lineEdit_passedPercent.setReadOnly(True)
         layout_statistics.addWidget(label_passedPercent, 4, 0)
         layout_statistics.addWidget(lineEdit_passedPercent, 4, 1)
 
         label_failedPercent = QLabel("Failed percentage:")
         lineEdit_failedPercent = QLineEdit("0%")
-        lineEdit_failedPercent.setAlignment(QtCore.Qt.AlignCenter)
+        lineEdit_failedPercent.setAlignment(Qt.AlignCenter)
         lineEdit_failedPercent.setReadOnly(True)
         layout_statistics.addWidget(label_failedPercent, 5, 0)
         layout_statistics.addWidget(lineEdit_failedPercent, 5, 1)
@@ -281,17 +294,8 @@ class Ui(QMainWindow):
         layout_control = QHBoxLayout()
         groupbox_control.setLayout(layout_control)
 
-        btn_run = QPushButton("Run")
-        btn_run.setMinimumSize(80, 35)
-        btn_run.setStyleSheet("QPushButton{border: 2px solid #72fa93; background-color:#a8fcbd;}"
-                              "QPushButton:hover{background-color: #72fa93;}"
-                              "QPushButton:pressed{border: 2px solid #34a871; background-color: #34a871;}")
-
-        btn_stop = QPushButton("Stop")
-        btn_stop.setMinimumSize(80, 35)
-        btn_stop.setStyleSheet("QPushButton{border: 2px solid #f2a298; background-color:#f5d6d6;}"
-                               "QPushButton:hover{background-color: #f2a298;}"
-                               "QPushButton:pressed{border: 2px solid #e45642; background-color: #e45642;}")
+        btn_run = ButtonInit("Run", "Start system", 80, 35, "#72fa93", "#a8fcbd", "#34a871")
+        btn_stop = ButtonInit("Stop", "Stop system", 80, 35, "#f2a298", "#f5d6d6", "#e45642")
 
         layout_control.addWidget(btn_run)
         layout_control.addWidget(btn_stop)
@@ -315,12 +319,8 @@ class Ui(QMainWindow):
         groupbox_log.setLayout(layout_log)
 
         textEdit_log = QPlainTextEdit()
-        btn_logClear = QPushButton("Clear Log")
-        btn_logClear.setToolTip("Clear all log entries history")
-        btn_logClear.setMinimumSize(80, 35)
-        btn_logClear.setStyleSheet("QPushButton{border: 2px solid #9f8c86; background-color: #f0eae7;}"
-                                   "QPushButton:hover{background-color: #9f8c86;}"
-                                   "QPushButton:pressed{border: 2px solid #895b4a; background-color: #895b4a;}")
+
+        btn_logClear = ButtonInit("Clear Log", "Clear all log entries history", 80, 35, '#9f8c86', '#f0eae7', '#895b4a')
 
         layout_log.addWidget(textEdit_log)
         layout_log.addWidget(btn_logClear)
@@ -342,35 +342,23 @@ class Ui(QMainWindow):
         # Detail process
         groupbox_detailProcess = QGroupBox("Detail Process")
         layout_detailProcess = QVBoxLayout()
-        layout_detailProcess.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
+        layout_detailProcess.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         groupbox_detailProcess.setLayout(layout_detailProcess)
 
         label_contour = QLabel("Contour Process")
-
-        holder_contour = QLabel()
-        holder_contour.setMinimumSize(150, 150)
-        holder_contour.setPixmap(QPixmap("./media/pic/150x150_1.png"))
-        holder_contour.setScaledContents(True)
+        holder_contour = MediaHolder("./media/pic/150x150_1.png", 150, 150)
 
         label_hough = QLabel("Hough Circle Process")
-
-        holder_hough = QLabel()
-        holder_hough.setMinimumSize(150, 150)
-        holder_hough.setPixmap(QPixmap("./media/pic/150x150_2.png"))
-        holder_hough.setScaledContents(True)
+        holder_hough = MediaHolder("./media/pic/150x150_2.png", 150, 150)
 
         label_yolo = QLabel("Yolo Process")
+        holder_yolo = MediaHolder("./media/pic/150x150_3.png", 150, 150)
 
-        holder_yolo = QLabel()
-        holder_yolo.setMinimumSize(150, 150)
-        holder_yolo.setPixmap(QPixmap("./media/pic/150x150_3.png"))
-        holder_yolo.setScaledContents(True)
-
-        layout_detailProcess.addWidget(label_contour, alignment=QtCore.Qt.AlignCenter)
+        layout_detailProcess.addWidget(label_contour, alignment=Qt.AlignCenter)
         layout_detailProcess.addWidget(holder_contour)
-        layout_detailProcess.addWidget(label_hough, alignment=QtCore.Qt.AlignCenter)
+        layout_detailProcess.addWidget(label_hough, alignment=Qt.AlignCenter)
         layout_detailProcess.addWidget(holder_hough)
-        layout_detailProcess.addWidget(label_yolo, alignment=QtCore.Qt.AlignCenter)
+        layout_detailProcess.addWidget(label_yolo, alignment=Qt.AlignCenter)
         layout_detailProcess.addWidget(holder_yolo)
 
         layout_right.addWidget(groupbox_detailProcess)
@@ -384,7 +372,7 @@ class Ui(QMainWindow):
         layout_param.addLayout(layout_paramCfg)
 
         label_errorThreshold = QLabel("Error Threshold")
-        slider_errorThreshold = QSlider(QtCore.Qt.Horizontal)
+        slider_errorThreshold = QSlider(Qt.Horizontal)
         slider_errorThreshold.setToolTip("Set the threshold for error percentage of the bearing seal size")
         spinbox_errorThreshold = QSpinBox()
         spinbox_errorThreshold.setToolTip("Set the threshold for error percentage of the bearing seal size")
@@ -396,19 +384,10 @@ class Ui(QMainWindow):
         layout_saveCfg = QHBoxLayout()
         layout_param.addLayout(layout_saveCfg)
 
-        btn_defaultCfg = QPushButton("Reset settings")
-        btn_defaultCfg.setToolTip("Reset all parameters to default value")
-        btn_defaultCfg.setMinimumSize(80, 35)
-        btn_defaultCfg.setStyleSheet("QPushButton{border: 2px solid #a6c4d0; background-color: #cadde4;}"
-                                     "QPushButton:hover{background-color: #a6c4d0;}"
-                                     "QPushButton:pressed{border: 2px solid #88acbc; background-color: #88acbc;}")
-
-        btn_saveCfg = QPushButton("Save settings")
-        btn_saveCfg.setToolTip("Save all parameters was set by user")
-        btn_saveCfg.setMinimumSize(80, 35)
-        btn_saveCfg.setStyleSheet("QPushButton{border: 2px solid #a6c4d0; background-color: #cadde4;}"
-                                  "QPushButton:hover{background-color: #a6c4d0;}"
-                                  "QPushButton:pressed{border: 2px solid #88acbc; background-color: #88acbc;}")
+        btn_defaultCfg = ButtonInit("Reset settings", "Reset all parameters to default value", 90, 35, "#a6c4d0",
+                                    "#cadde4", "#88acbc")
+        btn_saveCfg = ButtonInit("Save settings", "Save all parameters was set by user", 90, 35, "#a6c4d0", "#cadde4",
+                                 "#88acbc")
 
         layout_saveCfg.addWidget(btn_defaultCfg)
         layout_saveCfg.addWidget(btn_saveCfg)
