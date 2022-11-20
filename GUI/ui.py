@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QPixmap, QPainter
-from PySide6.QtWidgets import QMainWindow, QDockWidget, QVBoxLayout, QTextEdit, QFrame, QHBoxLayout, QGroupBox, QLabel, \
-    QComboBox, QPushButton, QCheckBox, QLineEdit, QWidget, QPlainTextEdit, QGridLayout, QSlider, QSpinBox
+from PySide6.QtWidgets import QMainWindow, QDockWidget, QVBoxLayout, QTextEdit, QFrame, QHBoxLayout, QGroupBox, \
+    QLabel, QComboBox, QPushButton, QCheckBox, QLineEdit, QWidget, QPlainTextEdit, QGridLayout, QSlider, QSpinBox
 
 
 class MediaHolder(QLabel):
@@ -16,7 +16,7 @@ class MediaHolder(QLabel):
         holder_x = self.x()
         holder_y = self.y()
         holder_coordinates = QPoint(holder_x, holder_y)
-        scaled_pixmap = self.pixmap.scaled(holder_size, Qt.KeepAspectRatio, Qt.FastTransformation)
+        scaled_pixmap = self.pixmap.scaled(holder_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         # start painting the label from left upper corner
         holder_coordinates.setX((holder_size.width() - scaled_pixmap.width()) / 2)
         holder_coordinates.setY((holder_size.height() - scaled_pixmap.height()) / 2)
@@ -44,9 +44,31 @@ class ButtonInit(QPushButton):
                                color1, color2, color1, color3, color3))
 
 
+class StatisticsInit(QLineEdit):
+    def __init__(self, init_value, rw, min_w, min_h, color1=None, color2=None):
+        super(StatisticsInit, self).__init__()
+        self.setAlignment(Qt.AlignCenter)
+        if rw == 1:
+            self.setReadOnly(False)
+        else:
+            self.setReadOnly(True)
+        self.setMinimumSize(min_w, min_h)
+        if color1 and color2 is not None:
+            self.setText(str(init_value))
+            self.setStyleSheet("QLineEdit{background-color: %s;}"
+                               "QLineEdit:focus{border: 2px solid %s;}" % (color1, color2))
+        else:
+            self.setText(str(init_value) + "%")
+
+
 class Ui(QMainWindow):
     def __init__(self):
         super(Ui, self).__init__()
+        self.frame_right = None
+        self.frame_bot = None
+        self.frame_left = None
+        self.frame_top = None
+        self.frame_center = None
         self.main_window()
         self.center()
 
@@ -226,9 +248,15 @@ class Ui(QMainWindow):
         holder_result = MediaHolder("./media/pic/200x200.png", 200, 200)
 
         label_result = QLabel("Result show here")
+        label_result.setMinimumSize(180, 44)
+        label_result.setStyleSheet(
+            "QLabel{border-radius: 22px; background-color: #e8ecec; font-color: white; font-size: 20px;"
+            "qproperty-alignment: 'AlignCenter';}")
 
         layout_result.addWidget(holder_result)
+        layout_result.setStretchFactor(holder_result, 3)
         layout_result.addWidget(label_result, alignment=Qt.AlignCenter)
+        layout_result.setStretchFactor(label_result, 1)
 
         groupbox_statistics = QGroupBox("Statistics")
 
@@ -238,34 +266,19 @@ class Ui(QMainWindow):
         layout_statistics.setColumnStretch(1, 1)
 
         label_totalNum = QLabel("Total Classified:")
-        lineEdit_totalNum = QLineEdit("0")
-        lineEdit_totalNum.setAlignment(Qt.AlignCenter)
-        lineEdit_totalNum.setReadOnly(True)
-        lineEdit_totalNum.setMinimumSize(110, 35)
-        lineEdit_totalNum.setStyleSheet("QLineEdit{border: 2px solid #6695ED; background-color: #6695ED;}"
-                                        "QLineEdit:focus{border: 2px solid #1f3efa;}")
+        lineEdit_totalNum = StatisticsInit(0, 0, 110, 35, "#6695ED", "#1f3efa")
 
         layout_statistics.addWidget(label_totalNum, 0, 0)
         layout_statistics.addWidget(lineEdit_totalNum, 0, 1)
 
         label_passedNum = QLabel("Total Passed:")
-        lineEdit_passedNum = QLineEdit("0")
-        lineEdit_passedNum.setAlignment(Qt.AlignCenter)
-        lineEdit_passedNum.setReadOnly(True)
-        lineEdit_passedNum.setMinimumSize(110, 35)
-        lineEdit_passedNum.setStyleSheet("QLineEdit{border: 2px solid #72fa93; background-color: #72fa93;}"
-                                         "QLineEdit:focus{border: 2px solid #40d872;}")
+        lineEdit_passedNum = StatisticsInit(0, 0, 110, 35, "#72fa93", "#40d872")
 
         layout_statistics.addWidget(label_passedNum, 1, 0)
         layout_statistics.addWidget(lineEdit_passedNum, 1, 1)
 
         label_failedNum = QLabel("Total Failed:")
-        lineEdit_failedNum = QLineEdit("0")
-        lineEdit_failedNum.setAlignment(Qt.AlignCenter)
-        lineEdit_failedNum.setReadOnly(True)
-        lineEdit_failedNum.setMinimumSize(110, 35)
-        lineEdit_failedNum.setStyleSheet("QLineEdit{border: 2px solid #e36255; background-color: #e36255;}"
-                                         "QLineEdit:focus{border: 2px solid #d31638;}")
+        lineEdit_failedNum = StatisticsInit(0, 0, 110, 35, "#e36255", "#d31638")
 
         layout_statistics.addWidget(label_failedNum, 2, 0)
         layout_statistics.addWidget(lineEdit_failedNum, 2, 1)
@@ -276,16 +289,12 @@ class Ui(QMainWindow):
         layout_statistics.addWidget(frame_split, 3, 0, 1, 2)
 
         label_passedPercent = QLabel("Passed percentage:")
-        lineEdit_passedPercent = QLineEdit("0%")
-        lineEdit_passedPercent.setAlignment(Qt.AlignCenter)
-        lineEdit_passedPercent.setReadOnly(True)
+        lineEdit_passedPercent = StatisticsInit(0, 0, 110, 35)
         layout_statistics.addWidget(label_passedPercent, 4, 0)
         layout_statistics.addWidget(lineEdit_passedPercent, 4, 1)
 
         label_failedPercent = QLabel("Failed percentage:")
-        lineEdit_failedPercent = QLineEdit("0%")
-        lineEdit_failedPercent.setAlignment(Qt.AlignCenter)
-        lineEdit_failedPercent.setReadOnly(True)
+        lineEdit_failedPercent = StatisticsInit(0, 0, 110, 35)
         layout_statistics.addWidget(label_failedPercent, 5, 0)
         layout_statistics.addWidget(lineEdit_failedPercent, 5, 1)
 
@@ -308,8 +317,7 @@ class Ui(QMainWindow):
         layout_left.setStretchFactor(groupbox_statistics, 3)
         layout_left.setStretchFactor(groupbox_control, 1)
 
-        # Bottom dock
-
+    # Bottom dock
     def log(self):
         self.frame_bot = QFrame()
 
@@ -342,7 +350,7 @@ class Ui(QMainWindow):
         # Detail process
         groupbox_detailProcess = QGroupBox("Detail Process")
         layout_detailProcess = QVBoxLayout()
-        layout_detailProcess.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        # layout_detailProcess.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         groupbox_detailProcess.setLayout(layout_detailProcess)
 
         label_contour = QLabel("Contour Process")
@@ -356,10 +364,13 @@ class Ui(QMainWindow):
 
         layout_detailProcess.addWidget(label_contour, alignment=Qt.AlignCenter)
         layout_detailProcess.addWidget(holder_contour)
+        layout_detailProcess.setStretchFactor(holder_contour, 2)
         layout_detailProcess.addWidget(label_hough, alignment=Qt.AlignCenter)
         layout_detailProcess.addWidget(holder_hough)
+        layout_detailProcess.setStretchFactor(holder_hough, 2)
         layout_detailProcess.addWidget(label_yolo, alignment=Qt.AlignCenter)
         layout_detailProcess.addWidget(holder_yolo)
+        layout_detailProcess.setStretchFactor(holder_yolo, 2)
 
         layout_right.addWidget(groupbox_detailProcess)
 
@@ -394,6 +405,9 @@ class Ui(QMainWindow):
 
         layout_right.addWidget(groupbox_detailProcess)
         layout_right.addWidget(groupbox_param)
+
+        layout_right.setStretchFactor(groupbox_detailProcess, 5)
+        layout_right.setStretchFactor(groupbox_param, 2)
 
     def makeup(self):
         self.setStyleSheet("QMainWindow{background-color: #eff0f7;}"
