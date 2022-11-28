@@ -1,7 +1,13 @@
-from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QPixmap, QPainter
-from PySide6.QtWidgets import QMainWindow, QDockWidget, QVBoxLayout, QTextEdit, QFrame, QHBoxLayout, QGroupBox, \
-    QLabel, QComboBox, QPushButton, QCheckBox, QLineEdit, QWidget, QPlainTextEdit, QGridLayout, QSlider, QSpinBox
+from PySide6.QtCore import Qt, QPoint, Slot, QIODeviceBase, QTimer
+from PySide6.QtGui import QPixmap, QPainter, QImage
+from PySide6.QtMultimedia import QMediaDevices
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtStateMachine import QStateMachine, QState
+from PySide6.QtWidgets import QMainWindow, QDockWidget, QVBoxLayout, QFrame, QHBoxLayout, QGroupBox, QLabel, QComboBox, \
+    QPushButton, QCheckBox, QLineEdit, QWidget, QPlainTextEdit, QGridLayout, QSlider, QSpinBox
+
+from thread import Thread
+import time
 
 
 class MediaHolder(QLabel):
@@ -24,17 +30,29 @@ class MediaHolder(QLabel):
 
 
 class DockInit(QDockWidget):
-    def __init__(self, name, title, widget):
+    def __init__(self, title, widget, min_w=None, min_h=None, max_w=None, max_h=None):
         super(DockInit, self).__init__()
-        self.setObjectName(name)
         self.setTitleBarWidget(title)
         self.setWidget(widget)
+
+        if min_w is not None:
+            self.setMinimumWidth(min_w)
+
+        if min_h is not None:
+            self.setMinimumHeight(min_h)
+
+        if max_w is not None:
+            self.setMaximumWidth(max_w)
+
+        if max_h is not None:
+            self.setMaximumHeight(max_h)
 
 
 class ButtonInit(QPushButton):
     def __init__(self, name, tips, width, height, color1, color2, color3):
         super(ButtonInit, self).__init__()
         self.setText(name)
+        self.setCheckable(True)
         self.setMinimumWidth(width)
         self.setMinimumHeight(height)
         self.setToolTip(tips)
@@ -61,367 +79,532 @@ class StatisticsInit(QLineEdit):
             self.setText(str(init_value) + "%")
 
 
+class CenterWgt(QFrame):
+    def __init__(self):
+        super(CenterWgt, self).__init__()
+        self.frame_holder = None
+        self.layout()
+        self.func()
+
+    def layout(self):
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(main_layout)
+
+        # create cam show group box
+        cont = QGroupBox("Realtime Camera Display")
+
+        # create cam show area layout
+        cont_layout = QVBoxLayout()
+        cont.setLayout(cont_layout)
+
+        # create components inside cam show area
+        self.frame_holder = MediaHolder("./media/pic/800x600.jpg", 800, 600)
+        self.frame_holder.setMinimumSize(800,600)
+
+        # add components to cam show
+        cont_layout.addWidget(self.frame_holder)
+        main_layout.addWidget(cont)
+
+    def func(self):
+        pass
+
+
+class TopWgt(QFrame):
+    def __init__(self):
+        super(TopWgt, self).__init__()
+
+        self.cam_lst = None
+        self.cam_set_btn = None
+        self.port_lst = None
+        self.baud_lst = None
+        self.port_set_btn = None
+
+        self.layout()
+
+    def layout(self):
+        main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(15, 5, 15, 0)
+        self.setLayout(main_layout)
+
+        # Camera Settings
+        cam_set_cont = QGroupBox("Camera Settings")
+        cam_set_layout = QHBoxLayout()
+        cam_set_cont.setLayout(cam_set_layout)
+
+        cam_set_label = QLabel("Select camera")
+
+        self.cam_lst = QComboBox()
+        self.cam_lst.setToolTip("Select camera to connect")
+        self.cam_lst.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cam_set_btn = ButtonInit("Connect", "Connect to selected camera", 80, 35, "#fad4a6", "#fbe7ab", "#f8a57f")
+
+        cam_set_layout.addWidget(cam_set_label)
+        cam_set_layout.addStretch()
+        cam_set_layout.addWidget(self.cam_lst)
+        cam_set_layout.addStretch()
+        cam_set_layout.addWidget(self.cam_set_btn)
+
+        # Port Settings
+        port_set_cont = QGroupBox("Serial Port Settings")
+
+        port_set_layout = QHBoxLayout()
+        port_set_cont.setLayout(port_set_layout)
+
+        port_set_label = QLabel("Select serial port")
+        self.port_lst = QComboBox()
+        self.port_lst.setToolTip("Select COM port to connect")
+        self.port_lst.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+
+        baud_label = QLabel("Select baudrate")
+        self.baud_lst = QComboBox()
+        self.baud_lst.addItem("9600", QSerialPort.Baud9600)
+        self.baud_lst.addItem("19200", QSerialPort.Baud19200)
+        self.baud_lst.addItem("38400", QSerialPort.Baud38400)
+        self.baud_lst.addItem("115200", QSerialPort.Baud115200)
+        self.baud_lst.setToolTip("Select baudrate of the COM port")
+        self.baud_lst.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+
+        self.port_set_btn = ButtonInit("Connect", "Connect to selected COM port", 80, 35, "#fad4a6", "#fbe7ab",
+                                       "#f8a57f")
+
+        port_set_layout.addWidget(port_set_label)
+        port_set_layout.addSpacing(20)
+        port_set_layout.addWidget(self.port_lst)
+        port_set_layout.addStretch()
+        port_set_layout.addWidget(baud_label)
+        port_set_layout.addSpacing(20)
+        port_set_layout.addWidget(self.baud_lst)
+        port_set_layout.addStretch()
+        port_set_layout.addWidget(self.port_set_btn)
+
+        # Others
+        others_cont = QGroupBox("Others")
+        other_layout = QHBoxLayout()
+        others_cont.setLayout(other_layout)
+
+        img_save_cbox = QCheckBox("Save cropped image")
+        img_save_cbox.setToolTip("Save cropped image for future model training")
+
+        init_sys_btn = ButtonInit("Initialize System", "Set whole system to the initial working condition", 120, 35,
+                                  "#fad4a6", "#fbe7ab", "#f8a57f")
+
+        other_layout.addWidget(img_save_cbox)
+        other_layout.addStretch()
+        other_layout.addWidget(init_sys_btn)
+
+        # add containers to main layout
+        main_layout.addWidget(cam_set_cont)
+        main_layout.setSpacing(15)
+        main_layout.addWidget(port_set_cont)
+        main_layout.setSpacing(15)
+        main_layout.addWidget(others_cont)
+
+        main_layout.setStretchFactor(cam_set_cont, 2)
+        main_layout.setStretchFactor(port_set_cont, 3)
+        main_layout.setStretchFactor(others_cont, 2)
+
+
+class BotWgt(QFrame):
+    def __init__(self):
+        super(BotWgt, self).__init__()
+        self.log_text = None
+        self.log_clr_btn = None
+        self.layout()
+        self.connect_signal()
+
+    def layout(self):
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 15)
+        self.setLayout(main_layout)
+
+        log_cont = QGroupBox("Log")
+        main_layout.addWidget(log_cont)
+
+        cont_layout = QHBoxLayout()
+        log_cont.setLayout(cont_layout)
+
+        self.log_text = QPlainTextEdit()
+
+        self.log_clr_btn = ButtonInit("Clear Log", "Clear all log entries history", 80, 35, '#9f8c86', '#f0eae7',
+                                      '#895b4a')
+
+        cont_layout.addWidget(self.log_text)
+        cont_layout.addWidget(self.log_clr_btn)
+
+    def connect_signal(self):
+        self.log_clr_btn.clicked.connect(self.log_text.clear)
+
+    @Slot(str)
+    def send_log(self, message):
+        self.log_text.appendPlainText(message)
+
+
+class LeftWgt(QFrame):
+    def __init__(self):
+        super(LeftWgt, self).__init__()
+        self.result_frame_holder = None
+        self.final_result = None
+        self.total_value = None
+        self.passed_value = None
+        self.failed_value = None
+        self.passed_pct = None
+        self.failed_pct = None
+        self.run_btn = None
+        self.stop_btn = None
+        self.layout()
+        self.connect_signal()
+
+    def layout(self):
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(15, 0, 15, 15)
+        self.setLayout(main_layout)
+
+        # Result container
+        result_cont = QGroupBox("Result")
+        result_cont_layout = QVBoxLayout()
+        result_cont.setLayout(result_cont_layout)
+
+        self.result_frame_holder = MediaHolder("./media/pic/200x200.png", 200, 200)
+
+        self.final_result = QLabel("Result show here")
+        self.final_result.setMinimumSize(180, 44)
+        self.final_result.setStyleSheet(
+            "QLabel{border-radius: 22px; background-color: #e8ecec; font-color: white; font-size: 20px;"
+            "qproperty-alignment: 'AlignCenter';}")
+
+        result_cont_layout.addWidget(self.result_frame_holder)
+        result_cont_layout.setStretchFactor(self.result_frame_holder, 3)
+        result_cont_layout.addWidget(self.final_result, alignment=Qt.AlignCenter)
+        result_cont_layout.setStretchFactor(self.final_result, 1)
+
+        # Statistics container
+        statistics_cont = QGroupBox("Statistics")
+        statistics_layout = QGridLayout()
+        statistics_cont.setLayout(statistics_layout)
+        statistics_layout.setColumnStretch(0, 1)
+        statistics_layout.setColumnStretch(1, 1)
+
+        total_label = QLabel("Total Classified:")
+        self.total_value = StatisticsInit(0, 0, 110, 35, "#6695ED", "#1f3efa")
+
+        statistics_layout.addWidget(total_label, 0, 0)
+        statistics_layout.addWidget(self.total_value, 0, 1)
+
+        passed_label = QLabel("Total Passed:")
+        self.passed_value = StatisticsInit(0, 0, 110, 35, "#72fa93", "#40d872")
+
+        statistics_layout.addWidget(passed_label, 1, 0)
+        statistics_layout.addWidget(self.passed_value, 1, 1)
+
+        failed_label = QLabel("Total Failed:")
+        self.failed_value = StatisticsInit(0, 0, 110, 35, "#e36255", "#d31638")
+
+        statistics_layout.addWidget(failed_label, 2, 0)
+        statistics_layout.addWidget(self.failed_value, 2, 1)
+
+        split = QFrame()
+        split.setMaximumHeight(1)
+        split.setFrameShape(QFrame.StyledPanel)
+        statistics_layout.addWidget(split, 3, 0, 1, 2)
+
+        passed_pct_label = QLabel("Passed percentage:")
+        self.passed_pct = StatisticsInit(0, 0, 110, 35)
+        statistics_layout.addWidget(passed_pct_label, 4, 0)
+        statistics_layout.addWidget(self.passed_pct, 4, 1)
+
+        failed_pct_label = QLabel("Failed percentage:")
+        self.failed_pct = StatisticsInit(0, 0, 110, 35)
+        statistics_layout.addWidget(failed_pct_label, 5, 0)
+        statistics_layout.addWidget(self.failed_pct, 5, 1)
+
+        control_cnt = QGroupBox("Control")
+
+        control_layout = QHBoxLayout()
+        control_cnt.setLayout(control_layout)
+
+        self.run_btn = ButtonInit("Run", "Start system", 80, 35, "#72fa93", "#a8fcbd", "#34a871")
+        self.stop_btn = ButtonInit("Stop", "Stop system", 80, 35, "#f2a298", "#f5d6d6", "#e45642")
+
+        control_layout.addWidget(self.run_btn)
+        control_layout.addWidget(self.stop_btn)
+
+        # Add containers to main layout
+        main_layout.addWidget(result_cont)
+        main_layout.addWidget(statistics_cont)
+        main_layout.addWidget(control_cnt)
+
+        main_layout.setStretchFactor(result_cont, 3)
+        main_layout.setStretchFactor(statistics_cont, 3)
+        main_layout.setStretchFactor(control_cnt, 1)
+
+    def connect_signal(self):
+        pass
+
+
+class RightWgt(QFrame):
+    def __init__(self):
+        super(RightWgt, self).__init__()
+        self.contour_holder = None
+        self.hough_holder = None
+        self.yolo_holder = None
+        self.threshold_slider = None
+        self.threshold_value = None
+        self.default_cfg_btn = None
+        self.save_cfg_btn = None
+        self.layout()
+        self.connect_signal()
+
+    def layout(self):
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(15, 0, 15, 15)
+        self.setLayout(main_layout)
+
+        # Detail process
+        detail_cont = QGroupBox("Detail Process")
+        detail_layout = QVBoxLayout()
+        detail_cont.setLayout(detail_layout)
+
+        contour_label = QLabel("Contour Process")
+        self.contour_holder = MediaHolder("./media/pic/150x150_1.png", 150, 150)
+
+        hough_label = QLabel("Hough Circle Process")
+        self.hough_holder = MediaHolder("./media/pic/150x150_2.png", 150, 150)
+
+        yolo_label = QLabel("Yolo Process")
+        self.yolo_holder = MediaHolder("./media/pic/150x150_3.png", 150, 150)
+
+        detail_layout.addWidget(contour_label, alignment=Qt.AlignCenter)
+        detail_layout.addWidget(self.contour_holder)
+        detail_layout.setStretchFactor(self.contour_holder, 2)
+        detail_layout.addWidget(hough_label, alignment=Qt.AlignCenter)
+        detail_layout.addWidget(self.hough_holder)
+        detail_layout.setStretchFactor(self.hough_holder, 2)
+        detail_layout.addWidget(yolo_label, alignment=Qt.AlignCenter)
+        detail_layout.addWidget(self.yolo_holder)
+        detail_layout.setStretchFactor(self.yolo_holder, 2)
+
+        main_layout.addWidget(detail_cont)
+
+        # param setting
+        param_cont = QGroupBox("Parameter Settings")
+        param_layout = QVBoxLayout()
+        param_cont.setLayout(param_layout)
+
+        param_layout_child1 = QGridLayout()
+        param_layout.addLayout(param_layout_child1)
+
+        threshold_label = QLabel("Error Threshold")
+        self.threshold_slider = QSlider(Qt.Horizontal)
+        self.threshold_slider.setTickPosition(QSlider.TicksBelow)
+        self.threshold_slider.setMaximum(10)
+        self.threshold_slider.setTickInterval(1)
+        self.threshold_slider.setToolTip("Set the threshold for error percentage of the bearing seal size")
+
+        self.threshold_value = QSpinBox()
+        self.threshold_value.setMaximum(10)
+        self.threshold_value.setSuffix("%")
+        self.threshold_value.setToolTip("Set the threshold for error percentage of the bearing seal size")
+
+        param_layout_child1.addWidget(threshold_label, 0, 0)
+        param_layout_child1.addWidget(self.threshold_slider, 0, 1)
+        param_layout_child1.addWidget(self.threshold_value, 0, 2)
+
+        param_layout_child2 = QHBoxLayout()
+        param_layout.addLayout(param_layout_child2)
+
+        self.default_cfg_btn = ButtonInit("Reset settings", "Reset all parameters to default value", 90, 35, "#a6c4d0",
+                                          "#cadde4", "#88acbc")
+        self.save_cfg_btn = ButtonInit("Save settings", "Save all parameters was set by user", 90, 35, "#a6c4d0",
+                                       "#cadde4", "#88acbc")
+
+        param_layout_child2.addWidget(self.default_cfg_btn)
+        param_layout_child2.addWidget(self.save_cfg_btn)
+
+        main_layout.addWidget(detail_cont)
+        main_layout.addWidget(param_cont)
+
+        main_layout.setStretchFactor(detail_cont, 5)
+        main_layout.setStretchFactor(param_cont, 2)
+
+    def connect_signal(self):
+        self.threshold_slider.valueChanged.connect(self.threshold_value.setValue)
+        self.threshold_value.valueChanged.connect(self.threshold_slider.setValue)
+
+
 class Ui(QMainWindow):
     def __init__(self):
         super(Ui, self).__init__()
-        self.frame_right = None
-        self.frame_bot = None
-        self.frame_left = None
-        self.frame_top = None
-        self.frame_center = None
-        self.main_window()
-        self.center()
+        self.serial = QSerialPort()
+        self.wgt_center = None
+        self.wgt_top = None
+        self.wgt_bot = None
+        self.wgt_left = None
+        self.wgt_right = None
 
-    def main_window(self):
+        self.config_window()
+        self.center_window()
+        self.connect_signal()
+        self.makeup()
+
+        self.port_name = None
+        self.baud_rate = None
+        self.data_bits = QSerialPort.Data8
+        self.parity = QSerialPort.NoParity
+        self.stop_bits = QSerialPort.OneStop
+        self.flow_control = QSerialPort.SoftwareControl
+
+        self.init_num_port = 0
+        self.init_num_cam = 0
+
+        self.serial = QSerialPort(self)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(lambda: self.connected_devices_add())
+        self.timer.start(200)
+
+        self.th = Thread()
+
+    def config_window(self):
         # set main window title
         self.setWindowTitle("Bearing Seal Classification")
         self.setCorner(Qt.BottomLeftCorner, Qt.LeftDockWidgetArea)
         self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
 
-        # create layout for main window
-        layout_mainWindow = QVBoxLayout()
-
-        # call functions
-        self.camera_show()
-        self.quick_settings()
-        self.general()
-        self.log()
-        self.details()
-        self.makeup()
-
-        # create dock inside main window
-        dock_top = DockInit("Quick Settings", QWidget(None), self.frame_top)
-        dock_top.setMinimumHeight(110)
-        dock_top.setMaximumHeight(130)
+        # create docks inside main window
+        self.wgt_top = TopWgt()
+        dock_top = DockInit(QWidget(None), self.wgt_top, None, 110, None, 130)
         self.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, dock_top)
 
-        dock_left = DockInit("General", QWidget(None), self.frame_left)
-        dock_left.setMinimumWidth(270)
-        dock_left.setMaximumWidth(350)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock_left)
-
-        dock_bot = DockInit("Logs", QWidget(None), self.frame_bot)
-        dock_bot.setMinimumHeight(110)
-        dock_bot.setMinimumHeight(200)
+        self.wgt_bot = BotWgt()
+        dock_bot = DockInit(QWidget(None), self.wgt_bot, None, 110, None, 200)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock_bot)
 
-        dock_right = DockInit("Details", QWidget(None), self.frame_right)
-        dock_right.setMinimumWidth(270)
-        dock_right.setMaximumWidth(350)
+        self.wgt_left = LeftWgt()
+        dock_left = DockInit(QWidget(None), self.wgt_left, 270, None, 350, None)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock_left)
+
+        self.wgt_right = RightWgt()
+        dock_right = DockInit(QWidget(None), self.wgt_right, 270, None, 350, None)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock_right)
 
-        # add components to main window
-        layout_mainWindow.addWidget(QTextEdit())
-        self.setCentralWidget(self.frame_center)
-
-        # set layout for main window
-        self.setLayout(layout_mainWindow)
+        self.wgt_center = CenterWgt()
+        self.setCentralWidget(self.wgt_center)
 
         # display main window
         self.show()
 
-    # Center widget
-    def camera_show(self):
-        self.frame_center = QFrame()
-        layout_center = QVBoxLayout()
-        layout_center.setContentsMargins(0, 0, 0, 0)
-        self.frame_center.setLayout(layout_center)
+    def connect_signal(self):
+        self.wgt_top.port_set_btn.clicked.connect(lambda: self.port_control())
+        self.wgt_top.cam_set_btn.clicked.connect(lambda: self.cam_control())
 
-        # create cam show group box
-        groupbox_camShow = QGroupBox("Realtime Camera Display")
+        self.wgt_right.save_cfg_btn.clicked.connect(lambda: self.wgt_bot.send_log("Configuration Saved."))
+        self.wgt_right.default_cfg_btn.clicked.connect(lambda: self.wgt_bot.send_log("Reset to default settings."))
 
-        # create cam show area layout
-        layout_camShow = QVBoxLayout()
-        groupbox_camShow.setLayout(layout_camShow)
-
-        # create components inside cam show area
-        holder_camShow = MediaHolder("./media/pic/800x600.jpg", 800, 600)
-
-        # add components to cam show
-        layout_camShow.addWidget(holder_camShow)
-        layout_center.addWidget(groupbox_camShow)
-
-    # Top dock
-    def quick_settings(self):
-        # create container for quick settings area
-        self.frame_top = QFrame()
-        # create layout for quick settings
-        layout_top = QHBoxLayout()
-        layout_top.setContentsMargins(15, 5, 15, 0)
-        self.frame_top.setLayout(layout_top)
-
-        groupbox_camSet = QGroupBox("Camera Settings")
-
-        layout_camSet = QHBoxLayout()
-        groupbox_camSet.setLayout(layout_camSet)
-
-        label_camSet = QLabel("Select camera")
-
-        combobox_camSet = QComboBox()
-        combobox_camSet.setToolTip("Select camera to connect")
-        combobox_camSet.addItem("Build-in camera")
-        btn_camSet_connect = ButtonInit("Connect", "Connect to selected camera", 80, 35, "#fad4a6", "#fbe7ab",
-                                        "#f8a57f")
-
-        layout_camSet.addWidget(label_camSet)
-        layout_camSet.addStretch()
-        layout_camSet.addWidget(combobox_camSet)
-        layout_camSet.addStretch()
-        layout_camSet.addWidget(btn_camSet_connect)
-
-        groupbox_portSet = QGroupBox("Serial Port Settings")
-
-        layout_portSet = QHBoxLayout()
-        groupbox_portSet.setLayout(layout_portSet)
-
-        label_portSet = QLabel("Select serial port")
-        combobox_portSet = QComboBox()
-        combobox_portSet.setToolTip("Select COM port to connect")
-        combobox_portSet.addItem("COM1")
-
-        label_baudRateSet = QLabel("Select baudrate")
-        combobox_baudRateSet = QComboBox()
-        combobox_baudRateSet.setToolTip("Select baudrate of the COM port")
-        combobox_baudRateSet.addItem("115200")
-
-        btn_portSet_connect = ButtonInit("Connect", "Connect to selected COM port", 80, 35, "#fad4a6", "#fbe7ab",
-                                         "#f8a57f")
-
-        # add components to serial port settings
-        layout_portSet.addWidget(label_portSet, )
-        layout_portSet.addSpacing(20)
-        layout_portSet.addWidget(combobox_portSet)
-        layout_portSet.addStretch()
-        layout_portSet.addWidget(label_baudRateSet)
-        layout_portSet.addSpacing(20)
-        layout_portSet.addWidget(combobox_baudRateSet)
-        layout_portSet.addStretch()
-        layout_portSet.addWidget(btn_portSet_connect)
-
-        # create other settings group box
-        groupbox_otherSet = QGroupBox("Other Settings")
-
-        # create other settings layout
-        layout_otherSet = QHBoxLayout()
-        groupbox_otherSet.setLayout(layout_otherSet)
-
-        # create components inside other settings
-        checkbox_otherSet_showTab = QCheckBox("Hide Right Tab")
-        checkbox_otherSet_showTab.setToolTip("Show/hide additions tab for detail settings")
-
-        btn_otherSet_init = ButtonInit("Initialize System", "Set whole system to the initial working condition", 120,
-                                       35, "#fad4a6", "#fbe7ab", "#f8a57f")
-
-        # add components to other settings
-        layout_otherSet.addWidget(checkbox_otherSet_showTab)
-        layout_otherSet.addStretch()
-        layout_otherSet.addWidget(btn_otherSet_init)
-
-        ########################################
-        # END CREATE QUICK SETTINGS COMPONENTS #
-        ########################################
-
-        # add group box to frame
-        layout_top.addWidget(groupbox_camSet)
-        layout_top.setSpacing(15)
-        layout_top.addWidget(groupbox_portSet)
-        layout_top.setSpacing(15)
-        layout_top.addWidget(groupbox_otherSet)
-
-        layout_top.setStretchFactor(groupbox_camSet, 2)
-        layout_top.setStretchFactor(groupbox_portSet, 3)
-        layout_top.setStretchFactor(groupbox_otherSet, 2)
-
-    # Left dock
-    def general(self):
-        self.frame_left = QFrame()
-
-        layout_left = QVBoxLayout()
-        layout_left.setContentsMargins(15, 0, 15, 15)
-        self.frame_left.setLayout(layout_left)
-
-        groupbox_result = QGroupBox("Result")
-
-        layout_result = QVBoxLayout()
-        groupbox_result.setLayout(layout_result)
-
-        holder_result = MediaHolder("./media/pic/200x200.png", 200, 200)
-
-        label_result = QLabel("Result show here")
-        label_result.setMinimumSize(180, 44)
-        label_result.setStyleSheet(
-            "QLabel{border-radius: 22px; background-color: #e8ecec; font-color: white; font-size: 20px;"
-            "qproperty-alignment: 'AlignCenter';}")
-
-        layout_result.addWidget(holder_result)
-        layout_result.setStretchFactor(holder_result, 3)
-        layout_result.addWidget(label_result, alignment=Qt.AlignCenter)
-        layout_result.setStretchFactor(label_result, 1)
-
-        groupbox_statistics = QGroupBox("Statistics")
-
-        layout_statistics = QGridLayout()
-        groupbox_statistics.setLayout(layout_statistics)
-        layout_statistics.setColumnStretch(0, 1)
-        layout_statistics.setColumnStretch(1, 1)
-
-        label_totalNum = QLabel("Total Classified:")
-        lineEdit_totalNum = StatisticsInit(0, 0, 110, 35, "#6695ED", "#1f3efa")
-
-        layout_statistics.addWidget(label_totalNum, 0, 0)
-        layout_statistics.addWidget(lineEdit_totalNum, 0, 1)
-
-        label_passedNum = QLabel("Total Passed:")
-        lineEdit_passedNum = StatisticsInit(0, 0, 110, 35, "#72fa93", "#40d872")
-
-        layout_statistics.addWidget(label_passedNum, 1, 0)
-        layout_statistics.addWidget(lineEdit_passedNum, 1, 1)
-
-        label_failedNum = QLabel("Total Failed:")
-        lineEdit_failedNum = StatisticsInit(0, 0, 110, 35, "#e36255", "#d31638")
-
-        layout_statistics.addWidget(label_failedNum, 2, 0)
-        layout_statistics.addWidget(lineEdit_failedNum, 2, 1)
-
-        frame_split = QFrame()
-        frame_split.setMaximumHeight(1)
-        frame_split.setFrameShape(QFrame.StyledPanel)
-        layout_statistics.addWidget(frame_split, 3, 0, 1, 2)
-
-        label_passedPercent = QLabel("Passed percentage:")
-        lineEdit_passedPercent = StatisticsInit(0, 0, 110, 35)
-        layout_statistics.addWidget(label_passedPercent, 4, 0)
-        layout_statistics.addWidget(lineEdit_passedPercent, 4, 1)
-
-        label_failedPercent = QLabel("Failed percentage:")
-        lineEdit_failedPercent = StatisticsInit(0, 0, 110, 35)
-        layout_statistics.addWidget(label_failedPercent, 5, 0)
-        layout_statistics.addWidget(lineEdit_failedPercent, 5, 1)
-
-        groupbox_control = QGroupBox("Control")
-
-        layout_control = QHBoxLayout()
-        groupbox_control.setLayout(layout_control)
-
-        btn_run = ButtonInit("Run", "Start system", 80, 35, "#72fa93", "#a8fcbd", "#34a871")
-        btn_stop = ButtonInit("Stop", "Stop system", 80, 35, "#f2a298", "#f5d6d6", "#e45642")
-
-        layout_control.addWidget(btn_run)
-        layout_control.addWidget(btn_stop)
-
-        layout_left.addWidget(groupbox_result)
-        layout_left.addWidget(groupbox_statistics)
-        layout_left.addWidget(groupbox_control)
-
-        layout_left.setStretchFactor(groupbox_result, 3)
-        layout_left.setStretchFactor(groupbox_statistics, 3)
-        layout_left.setStretchFactor(groupbox_control, 1)
-
-    # Bottom dock
-    def log(self):
-        self.frame_bot = QFrame()
-
-        groupbox_log = QGroupBox("Log")
-
-        layout_log = QHBoxLayout()
-        groupbox_log.setLayout(layout_log)
-
-        textEdit_log = QPlainTextEdit()
-
-        btn_logClear = ButtonInit("Clear Log", "Clear all log entries history", 80, 35, '#9f8c86', '#f0eae7', '#895b4a')
-
-        layout_log.addWidget(textEdit_log)
-        layout_log.addWidget(btn_logClear)
-
-        layout_bot = QVBoxLayout()
-        layout_bot.setContentsMargins(0, 0, 0, 15)
-        self.frame_bot.setLayout(layout_bot)
-
-        layout_bot.addWidget(groupbox_log)
-
-    # Right dock
-    def details(self):
-        self.frame_right = QFrame()
-
-        layout_right = QVBoxLayout()
-        layout_right.setContentsMargins(15, 0, 15, 15)
-        self.frame_right.setLayout(layout_right)
-
-        # Detail process
-        groupbox_detailProcess = QGroupBox("Detail Process")
-        layout_detailProcess = QVBoxLayout()
-        # layout_detailProcess.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        groupbox_detailProcess.setLayout(layout_detailProcess)
-
-        label_contour = QLabel("Contour Process")
-        holder_contour = MediaHolder("./media/pic/150x150_1.png", 150, 150)
-
-        label_hough = QLabel("Hough Circle Process")
-        holder_hough = MediaHolder("./media/pic/150x150_2.png", 150, 150)
-
-        label_yolo = QLabel("Yolo Process")
-        holder_yolo = MediaHolder("./media/pic/150x150_3.png", 150, 150)
-
-        layout_detailProcess.addWidget(label_contour, alignment=Qt.AlignCenter)
-        layout_detailProcess.addWidget(holder_contour)
-        layout_detailProcess.setStretchFactor(holder_contour, 2)
-        layout_detailProcess.addWidget(label_hough, alignment=Qt.AlignCenter)
-        layout_detailProcess.addWidget(holder_hough)
-        layout_detailProcess.setStretchFactor(holder_hough, 2)
-        layout_detailProcess.addWidget(label_yolo, alignment=Qt.AlignCenter)
-        layout_detailProcess.addWidget(holder_yolo)
-        layout_detailProcess.setStretchFactor(holder_yolo, 2)
-
-        layout_right.addWidget(groupbox_detailProcess)
-
-        # param setting
-        groupbox_param = QGroupBox("Parameter Settings")
-        layout_param = QVBoxLayout()
-        groupbox_param.setLayout(layout_param)
-
-        layout_paramCfg = QGridLayout()
-        layout_param.addLayout(layout_paramCfg)
-
-        label_errorThreshold = QLabel("Error Threshold")
-        slider_errorThreshold = QSlider(Qt.Horizontal)
-        slider_errorThreshold.setToolTip("Set the threshold for error percentage of the bearing seal size")
-        spinbox_errorThreshold = QSpinBox()
-        spinbox_errorThreshold.setToolTip("Set the threshold for error percentage of the bearing seal size")
-
-        layout_paramCfg.addWidget(label_errorThreshold, 0, 0)
-        layout_paramCfg.addWidget(slider_errorThreshold, 0, 1)
-        layout_paramCfg.addWidget(spinbox_errorThreshold, 0, 2)
-
-        layout_saveCfg = QHBoxLayout()
-        layout_param.addLayout(layout_saveCfg)
-
-        btn_defaultCfg = ButtonInit("Reset settings", "Reset all parameters to default value", 90, 35, "#a6c4d0",
-                                    "#cadde4", "#88acbc")
-        btn_saveCfg = ButtonInit("Save settings", "Save all parameters was set by user", 90, 35, "#a6c4d0", "#cadde4",
-                                 "#88acbc")
-
-        layout_saveCfg.addWidget(btn_defaultCfg)
-        layout_saveCfg.addWidget(btn_saveCfg)
-
-        layout_right.addWidget(groupbox_detailProcess)
-        layout_right.addWidget(groupbox_param)
-
-        layout_right.setStretchFactor(groupbox_detailProcess, 5)
-        layout_right.setStretchFactor(groupbox_param, 2)
-
-    def makeup(self):
-        self.setStyleSheet("QMainWindow{background-color: #eff0f7;}"
-                           "QGroupBox{border: 2px solid #ffffff; border-radius: 10px; margin-top: 0.5em; font-family: "
-                           "'Segoe UI'; font-size: 14px; font-weight: regular; background-color: #ffffff;} "
-                           "QGroupBox:title{subcontrol-origin: margin;left: 10px;}"
-                           "QPushButton{border-radius: 10px; font-size: 14px;}"
-                           "QLineEdit{border-radius: 10px;}"
-                           "QPlainTextEdit{border-radius: 8px; background-color: #eff0f7;}"
-                           "QPlainTextEdit:focus{border: 2px solid #9dbdba;}"
-                           "QLabel,QCheckBox,QComboBox,QLineEdit,QPlainTextEdit{font-size: 14px;}")
-
-    def center(self):
+    def center_window(self):
         frame_geometry = self.frameGeometry()
         center_point = self.screen().availableGeometry().center()
         frame_geometry.moveCenter(center_point)
         self.move(frame_geometry.topLeft())
+
+    def makeup(self):
+        self.setStyleSheet("QMainWindow{background-color: #eff0f7;}"
+                           "QGroupBox{border-radius: 10px; margin-top: 0.5em; font-family: 'Segoe UI'; font-size: 14px;"
+                           "font-weight: regular; background-color: #ffffff;} "
+                           "QGroupBox:title{subcontrol-origin: margin;left: 10px;}"
+                           "QPushButton{border-radius: 10px; font-size: 14px;}"
+                           "QLineEdit{border-radius: 10px;}"
+                           "QPlainTextEdit{font-family: 'Cascadia Code'; border-radius: 8px; background-color: #eff0f7;}"
+                           "QPlainTextEdit:focus{border: 2px solid #9dbdba;}"
+                           "QLabel,QCheckBox,QComboBox,QLineEdit,QPlainTextEdit{font-size: 14px;}")
+
+    @Slot()
+    def connected_devices_add(self):
+        port_index = 0
+        cam_index = 0
+
+        port_num = len(QSerialPortInfo().availablePorts())
+        cam_num = len(QMediaDevices().videoInputs())
+
+        # Check new COM port connected
+        if port_num:
+            if port_num != self.init_num_port:
+                for port in QSerialPortInfo().availablePorts():
+                    port_index += 1
+                    self.wgt_top.port_lst.addItem(port.portName())
+                self.init_num_port = port_num
+            else:
+                pass
+        else:
+            port_index = 0
+            self.init_num_port = 0
+            self.wgt_top.port_lst.clear()
+
+        # Check new camera connected
+        if cam_num:
+            if cam_num != self.init_num_cam:
+                for available_camera in QMediaDevices.videoInputs():
+                    cam_index += 1
+                    self.wgt_top.cam_lst.addItem(available_camera.description(), cam_index-1)
+                self.init_num_cam = cam_num
+            else:
+                pass
+        else:
+            cam_index = 0
+            self.init_num_cam = 0
+            self.wgt_top.cam_lst.clear()
+
+    @Slot()
+    def port_control(self):
+        if self.wgt_top.port_set_btn.text() == "Connect":
+            self.port_name = self.wgt_top.port_lst.currentText()
+            self.baud_rate = self.wgt_top.baud_lst.currentData()
+
+            self.serial.setPortName(self.port_name)
+            self.serial.setBaudRate(self.baud_rate, QSerialPort.AllDirections)
+            self.serial.setDataBits(self.data_bits)
+            self.serial.setParity(self.parity)
+            self.serial.setStopBits(self.stop_bits)
+            self.serial.setFlowControl(self.flow_control)
+
+            if self.serial.open(QIODeviceBase.ReadWrite):
+                self.wgt_top.port_set_btn.setText("Disconnect")
+                self.wgt_bot.send_log("Connected to %s: %s, %s, %s, %s %s." % (
+                    self.port_name, self.baud_rate, self.data_bits, self.parity, self.stop_bits, self.flow_control))
+            else:
+                self.wgt_bot.send_log("Connect failed.")
+        else:
+            if self.serial.isOpen():
+                self.serial.close()
+                self.wgt_top.port_set_btn.setText("Connect")
+            self.wgt_bot.send_log("Port disconnected")
+
+    @Slot(bytearray)
+    def write_data(self, data):
+        self.serial.write(data)
+
+
+    @Slot()
+    def read_data(self):
+        data = self.serial.readAll()
+        BotWgt.send_log("Serial Message:" + str(data))
+
+    def cam_control(self):
+        if self.wgt_top.cam_set_btn.text() == "Connect":
+            self.th.connect_camera(self.wgt_top.cam_lst.currentData())
+            self.th.center_frame.connect(self.set_center_holder)
+            self.th.result_frame.connect(self.set_result_holder)
+            self.th.start()
+            self.wgt_top.cam_set_btn.setText("Disconnect")
+        else:
+            self.th.close_camera()
+            self.wgt_top.cam_set_btn.setText("Connect")
+
+    @Slot(QImage)
+    def set_center_holder(self, image):
+        self.wgt_center.frame_holder.pixmap = QPixmap(image)
+        self.wgt_center.frame_holder.update()
+
+    @Slot(QImage)
+    def set_result_holder(self, image):
+        self.wgt_left.result_frame_holder.pixmap = QPixmap(image)
+        self.wgt_left.result_frame_holder.update()
