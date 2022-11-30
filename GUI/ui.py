@@ -1,18 +1,18 @@
+import time
+
 from PySide6.QtCore import Qt, QPoint, Slot, QIODeviceBase, QTimer
 from PySide6.QtGui import QPixmap, QPainter, QImage
 from PySide6.QtMultimedia import QMediaDevices
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
-from PySide6.QtStateMachine import QStateMachine, QState
 from PySide6.QtWidgets import QMainWindow, QDockWidget, QVBoxLayout, QFrame, QHBoxLayout, QGroupBox, QLabel, QComboBox, \
     QPushButton, QCheckBox, QLineEdit, QWidget, QPlainTextEdit, QGridLayout, QSlider, QSpinBox
 
 from thread import Thread
-import time
 
 
 class MediaHolder(QLabel):
     def __init__(self, img, img_w, img_h):
-        super(MediaHolder, self).__init__()
+        super(MediaHolder, self).__init__(parent=None)
         self.pixmap = QPixmap(img)
         self.setMinimumSize(img_w, img_h)
 
@@ -100,7 +100,7 @@ class CenterWgt(QFrame):
 
         # create components inside cam show area
         self.frame_holder = MediaHolder("./media/pic/800x600.jpg", 800, 600)
-        self.frame_holder.setMinimumSize(800,600)
+        self.frame_holder.setMinimumSize(800, 600)
 
         # add components to cam show
         cont_layout.addWidget(self.frame_holder)
@@ -454,7 +454,9 @@ class Ui(QMainWindow):
         self.stop_bits = QSerialPort.OneStop
         self.flow_control = QSerialPort.SoftwareControl
 
-        self.init_num_port = 0
+        self.cam_name = None
+
+        self.init_port_num = 0
         self.init_num_cam = 0
 
         self.serial = QSerialPort(self)
@@ -527,29 +529,29 @@ class Ui(QMainWindow):
 
         # Check new COM port connected
         if port_num:
-            if port_num != self.init_num_port:
+            if port_num != self.init_port_num:
+                self.wgt_top.port_lst.clear()
                 for port in QSerialPortInfo().availablePorts():
                     port_index += 1
                     self.wgt_top.port_lst.addItem(port.portName())
-                self.init_num_port = port_num
+                self.init_port_num = port_num
             else:
                 pass
         else:
-            port_index = 0
-            self.init_num_port = 0
+            self.init_port_num = 0
             self.wgt_top.port_lst.clear()
 
         # Check new camera connected
         if cam_num:
             if cam_num != self.init_num_cam:
+                self.wgt_top.cam_lst.clear()
                 for available_camera in QMediaDevices.videoInputs():
                     cam_index += 1
-                    self.wgt_top.cam_lst.addItem(available_camera.description(), cam_index-1)
+                    self.wgt_top.cam_lst.addItem(available_camera.description(), cam_index - 1)
                 self.init_num_cam = cam_num
             else:
                 pass
         else:
-            cam_index = 0
             self.init_num_cam = 0
             self.wgt_top.cam_lst.clear()
 
@@ -571,7 +573,7 @@ class Ui(QMainWindow):
                 self.wgt_bot.send_log("Connected to %s: %s, %s, %s, %s %s." % (
                     self.port_name, self.baud_rate, self.data_bits, self.parity, self.stop_bits, self.flow_control))
             else:
-                self.wgt_bot.send_log("Connect failed.")
+                self.wgt_bot.send_log("Port connect failed.")
         else:
             if self.serial.isOpen():
                 self.serial.close()
@@ -582,22 +584,30 @@ class Ui(QMainWindow):
     def write_data(self, data):
         self.serial.write(data)
 
-
     @Slot()
     def read_data(self):
         data = self.serial.readAll()
-        BotWgt.send_log("Serial Message:" + str(data))
+        self.wgt_bot.send_log("Serial Message:" + str(data))
 
     def cam_control(self):
         if self.wgt_top.cam_set_btn.text() == "Connect":
-            self.th.connect_camera(self.wgt_top.cam_lst.currentData())
-            self.th.center_frame.connect(self.set_center_holder)
-            self.th.result_frame.connect(self.set_result_holder)
-            self.th.start()
-            self.wgt_top.cam_set_btn.setText("Disconnect")
+            self.cam_name = self.wgt_top.cam_lst.currentText()
+            if self.cam_name:
+                self.th.cam_index = self.wgt_top.cam_lst.currentData()
+                self.th.status = 1
+                self.th.center_frame.connect(self.set_center_holder)
+                self.th.result_frame.connect(self.set_result_holder)
+                self.th.cap_status.connect(self.set_btn_state)
+                self.th.start()
+                self.wgt_bot.send_log("Connected to %s." % self.cam_name)
+            else:
+                self.wgt_bot.send_log("Can't find any available camera")
         else:
-            self.th.close_camera()
-            self.wgt_top.cam_set_btn.setText("Connect")
+            self.th.disconnect_camera()
+            self.th.status = 0
+            self.th.quit()
+            self.th.wait()
+            self.wgt_bot.send_log("Camera disconnected")
 
     @Slot(QImage)
     def set_center_holder(self, image):
@@ -608,3 +618,10 @@ class Ui(QMainWindow):
     def set_result_holder(self, image):
         self.wgt_left.result_frame_holder.pixmap = QPixmap(image)
         self.wgt_left.result_frame_holder.update()
+
+    @Slot(bool)
+    def set_btn_state(self, value):
+        if value:
+            self.wgt_top.cam_set_btn.setText("Disconnect")
+        else:
+            self.wgt_top.cam_set_btn.setText("Connect")
